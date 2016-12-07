@@ -21,6 +21,10 @@ library
                      , servant-server
                      , wai
                      , warp
+                     , time
+                     , bytestring
+                     , cryptocipher
+                     , crypto-cipher-types
   default-language:    Haskell2010
 
 executable project-exe
