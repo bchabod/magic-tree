@@ -11,9 +11,13 @@ import Network.Wai
 import Network.Wai.Handler.Warp
 import Servant
 
+import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.List
+
 import Data.Time
 import Data.Time.Clock.POSIX
-
+import System.Entropy
 import Crypto.Cipher
 import Crypto.Cipher.Types
 import qualified Data.ByteString.Char8 as B
@@ -47,7 +51,6 @@ data Ticket = Ticket
   }
 $(deriveJSON defaultOptions ''Ticket)
 
--- type AccessAPI = "request" :> QueryParam "userId" Int :> QueryParam "server" String :> Get '[PlainText] String
 type AccessAPI = "request" :> QueryParam "userId" Int :> Get '[OctetStream] B.ByteString
 
 startAuth :: IO ()
@@ -68,26 +71,25 @@ padData input = input `B.append` padding
       x -> 16 - x
     inputLength = B.length input
 
-generateToken :: Int -> String -> B.ByteString
-generateToken id key = let sessionKey = "blabla"
-                           timeout = 10
-                           ticket = BL.toStrict $ encode (Ticket {userIdS = id, sessionKeyS = sessionKey, timeoutS = timeout})
-                           encryptedTicket = ecbEncrypt aesServer (padData ticket)
-                           token = BL.toStrict $ encode (Token {ticket = B.unpack $ encryptedTicket, sessionKeyC = sessionKey, timeoutC = timeout})
-                           Right userKey = makeKey $ B.pack $ key
-                           aesClient = cipherInit userKey :: AES128
-                        in ecbEncrypt aesClient (padData token)
+generateToken :: Int -> String -> Int -> String -> B.ByteString
+generateToken id key t s = let ticket = BL.toStrict $ encode (Ticket {userIdS = id, sessionKeyS = s, timeoutS = t})
+                               encryptedTicket = ecbEncrypt aesServer (padData ticket)
+                               token = BL.toStrict $ encode (Token {ticket = B.unpack $ encryptedTicket, sessionKeyC = s, timeoutC = t})
+                               Right userKey = makeKey $ B.pack $ key
+                               aesClient = cipherInit userKey :: AES128
+                            in ecbEncrypt aesClient (padData token)
 
 server :: Server AccessAPI
-server = requestToken
-  where requestToken :: Maybe Int -> Handler B.ByteString
-        requestToken id = return $ case id of
-          Nothing -> B.pack "No user ID given"
-          Just id -> let filteredUsers = filter (\u -> userId u == id) users in
-                     case (length $ filteredUsers) of
-                       0 -> B.pack "No user found"
-                       1 -> generateToken id (userKey $ head $ filteredUsers)
-                       _ -> B.pack "Error: multiple users for that ID"
+server id = do
+  timeout <- liftIO $ round `fmap` getPOSIXTime
+  sessionKey <- liftIO $ getEntropy 16
+  return $ case id of
+    Nothing -> B.pack "No user ID given"
+    Just id -> let filteredUsers = filter (\u -> userId u == id) users in
+               case (length $ filteredUsers) of
+                 0 -> B.pack "No user found"
+                 1 -> generateToken id (userKey $ head $ filteredUsers) (timeout + 60) (B.unpack $ sessionKey)
+                 _ -> B.pack "Error: multiple users for that ID"
 
 users :: [User]
 users = [ User 1 "v2VxGDC61jV6E45J"

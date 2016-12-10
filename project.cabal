@@ -25,6 +25,8 @@ library
                      , bytestring
                      , cryptocipher
                      , crypto-cipher-types
+                     , entropy
+                     , mtl
   default-language:    Haskell2010
 
 executable project-exe
