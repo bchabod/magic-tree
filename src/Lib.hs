@@ -23,8 +23,8 @@ import Data.Char (chr)
 -- Prepare server secret
 serverSecret = B.pack "7od3048S5Z79t84A"
 Right key = makeKey serverSecret
-aes128 :: AES128
-aes128 = cipherInit key
+aesServer :: AES128
+aesServer = cipherInit key
 
 -- User ID + their secret
 data User = User
@@ -68,13 +68,15 @@ padData input = input `B.append` padding
       x -> 16 - x
     inputLength = B.length input
 
-generateToken :: Int -> B.ByteString
-generateToken id = let sessionKey = "blabla"
-                       timeout = 10
-                       ticket = BL.toStrict $ encode (Ticket {userIdS = id, sessionKeyS = sessionKey, timeoutS = timeout})
-                       encryptedTicket = ecbEncrypt aes128 (padData ticket)
-                       token = encode (Token {ticket = B.unpack $ encryptedTicket, sessionKeyC = sessionKey, timeoutC = timeout})
-                    in BL.toStrict $ token
+generateToken :: Int -> String -> B.ByteString
+generateToken id key = let sessionKey = "blabla"
+                           timeout = 10
+                           ticket = BL.toStrict $ encode (Ticket {userIdS = id, sessionKeyS = sessionKey, timeoutS = timeout})
+                           encryptedTicket = ecbEncrypt aesServer (padData ticket)
+                           token = BL.toStrict $ encode (Token {ticket = B.unpack $ encryptedTicket, sessionKeyC = sessionKey, timeoutC = timeout})
+                           Right userKey = makeKey $ B.pack $ key
+                           aesClient = cipherInit userKey :: AES128
+                        in ecbEncrypt aesClient (padData token)
 
 server :: Server AccessAPI
 server = requestToken
@@ -84,10 +86,10 @@ server = requestToken
           Just id -> let filteredUsers = filter (\u -> userId u == id) users in
                      case (length $ filteredUsers) of
                        0 -> B.pack "No user found"
-                       1 -> generateToken $ id -- userKey $ head $ filteredUsers
+                       1 -> generateToken id (userKey $ head $ filteredUsers)
                        _ -> B.pack "Error: multiple users for that ID"
 
 users :: [User]
-users = [ User 1 "4wQ0cfD45wfr1LZDQzx4dPk119cCyM0G"
-        , User 2 "F9s3Y9O8369sN8p88XJzz8SL2siL4b18"
+users = [ User 1 "v2VxGDC61jV6E45J"
+        , User 2 "E6eAcW89NT13e3xp"
         ]
