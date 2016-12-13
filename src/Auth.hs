@@ -1,9 +1,7 @@
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators   #-}
-module Lib
-  ( startAuth
-  ) where
+module Auth where
 
 import Data.Aeson
 import Data.Aeson.TH
@@ -26,11 +24,15 @@ import Data.Char (chr)
 
 -- Prepare server secret
 serverSecret = B.pack "7od3048S5Z79t84A"
-Right key = makeKey serverSecret
+Right sKey = makeKey serverSecret
 aesServer :: AES128
-aesServer = cipherInit key
+aesServer = cipherInit sKey
 
 -- User ID + their secret
+users :: [User]
+users = [ User 1 "v2VxGDC61jV6E45J"
+        , User 2 "E6eAcW89NT13e3xp"]
+
 data User = User
   { userId        :: Int
   , userKey       :: String
@@ -90,8 +92,3 @@ server id = do
                  0 -> B.pack "No user found"
                  1 -> generateToken id (userKey $ head $ filteredUsers) (timeout + 60) (B.unpack $ sessionKey)
                  _ -> B.pack "Error: multiple users for that ID"
-
-users :: [User]
-users = [ User 1 "v2VxGDC61jV6E45J"
-        , User 2 "E6eAcW89NT13e3xp"
-        ]

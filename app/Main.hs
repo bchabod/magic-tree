@@ -1,6 +1,12 @@
 module Main where
 
-import Lib
+import System.Environment
+import Auth
+import Client
 
 main :: IO ()
-main = startAuth
+main = do
+    args <- getArgs
+    case (head $ args) of
+        "auth" -> startAuth
+        "client" -> startClient
