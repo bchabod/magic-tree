@@ -56,10 +56,10 @@ $(deriveJSON defaultOptions ''Ticket)
 type AccessAPI = "request" :> QueryParam "userId" Int :> Get '[OctetStream] B.ByteString
 
 startAuth :: IO ()
-startAuth = run 8080 authenticationServer
+startAuth = run 8080 authenticationApp
 
-authenticationServer :: Application
-authenticationServer = serve api server
+authenticationApp :: Application
+authenticationApp = serve api serverAuth
 
 api :: Proxy AccessAPI
 api = Proxy
@@ -81,8 +81,8 @@ generateToken id key t s = let ticket = BL.toStrict $ encode (Ticket {userIdS = 
                                aesClient = cipherInit userKey :: AES128
                             in ecbEncrypt aesClient (padData token)
 
-server :: Server AccessAPI
-server id = do
+serverAuth :: Server AccessAPI
+serverAuth id = do
   timeout <- liftIO $ round `fmap` getPOSIXTime
   sessionKey <- liftIO $ getEntropy 16
   return $ case id of
