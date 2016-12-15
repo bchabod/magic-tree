@@ -20,7 +20,7 @@ import Crypto.Cipher
 import Crypto.Cipher.Types
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
-import Data.Char (chr)
+
 import Auth
 
 data DownloadForm = DownloadForm
@@ -61,13 +61,13 @@ serverFile = download
               liftIO $ putStrLn $ "Could not decode download request..."
               return $ B.pack "ERROR"
             Just decodedForm -> do
-              let (Just ticket) = decode (BL.fromStrict $ fst . B.spanEnd (== (chr 0)) $ ecbDecrypt aesServer $ B.pack $ ticketD decodedForm) :: Maybe Ticket
+              let (Just ticket) = decode (BL.fromStrict $ unpad $ ecbDecrypt aesServer $ B.pack $ ticketD decodedForm) :: Maybe Ticket
               timeNow <- liftIO $ round `fmap` getPOSIXTime
               if timeNow < timeoutS ticket
                 then do
                   let Right sessionKey = makeKey $ B.pack $ sessionKeyS ticket
                   let aesSession = (cipherInit sessionKey) :: AES128
-                  let realPath = B.unpack $ fst . B.spanEnd (== (chr 0)) $ ecbDecrypt aesSession $ B.pack $ pathD decodedForm
+                  let realPath = B.unpack $ unpad $ ecbDecrypt aesSession $ B.pack $ pathD decodedForm
                   contents <- liftIO $ readFile ("files/" ++ realPath)
                   return $ B.pack $ contents
               else do
@@ -82,14 +82,14 @@ serverFile = download
               liftIO $ putStrLn $ "Could not decode upload request..."
               return $ B.pack "ERROR"
             Just decodedForm -> do
-              let (Just ticket) = decode (BL.fromStrict $ fst . B.spanEnd (== (chr 0)) $ ecbDecrypt aesServer $ B.pack $ ticketU decodedForm) :: Maybe Ticket
+              let (Just ticket) = decode (BL.fromStrict $ unpad $ ecbDecrypt aesServer $ B.pack $ ticketU decodedForm) :: Maybe Ticket
               timeNow <- liftIO $ round `fmap` getPOSIXTime
               if timeNow < timeoutS ticket
                 then do
                   let Right sessionKey = makeKey $ B.pack $ sessionKeyS ticket
                   let aesSession = (cipherInit sessionKey) :: AES128
-                  let realPath = B.unpack $ fst . B.spanEnd (== (chr 0)) $ ecbDecrypt aesSession $ B.pack $ pathU decodedForm
-                  let realFile = fst . B.spanEnd (== (chr 0)) $ ecbDecrypt aesSession $ B.pack $ fileU decodedForm
+                  let realPath = B.unpack $ unpad $ ecbDecrypt aesSession $ B.pack $ pathU decodedForm
+                  let realFile = unpad $ ecbDecrypt aesSession $ B.pack $ fileU decodedForm
                   liftIO $ writeFile ("files/" ++ realPath) (B.unpack realFile)
                   return $ B.pack "OK"
               else do

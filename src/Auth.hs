@@ -64,8 +64,8 @@ authenticationApp = serve api serverAuth
 api :: Proxy AccessAPI
 api = Proxy
 
-padData :: B.ByteString -> B.ByteString
-padData input = input `B.append` padding
+pad :: B.ByteString -> B.ByteString
+pad input = input `B.append` padding
   where
     padding = B.replicate requiredPadding (chr 0)
     requiredPadding = case inputLength `mod` 16 of
@@ -73,13 +73,16 @@ padData input = input `B.append` padding
       x -> 16 - x
     inputLength = B.length input
 
+unpad :: B.ByteString -> B.ByteString
+unpad input = fst . B.spanEnd (== (chr 0)) $ input
+
 generateToken :: Int -> String -> Int -> String -> B.ByteString
 generateToken id key t s = let ticket = BL.toStrict $ encode (Ticket {userIdS = id, sessionKeyS = s, timeoutS = t})
-                               encryptedTicket = ecbEncrypt aesServer (padData ticket)
+                               encryptedTicket = ecbEncrypt aesServer (pad ticket)
                                token = BL.toStrict $ encode (Token {ticket = B.unpack $ encryptedTicket, sessionKeyC = s, timeoutC = t})
                                Right userKey = makeKey $ B.pack $ key
                                aesClient = cipherInit userKey :: AES128
-                            in ecbEncrypt aesClient (padData token)
+                            in ecbEncrypt aesClient (pad token)
 
 serverAuth :: Server AccessAPI
 serverAuth id = do
