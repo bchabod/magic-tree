@@ -80,7 +80,9 @@ startClient = do
             Left err -> putStrLn $ "Could not download file..."
             Right (f) -> do
               putStrLn $ "Received file: "
-              print f
+              let Right sessionKey = makeKey $ B.pack $ sessionKeyC tk
+              let aesSession = (cipherInit sessionKey) :: AES128
+              print $ unpad $ ecbDecrypt aesSession $ f
     _   -> do
       putStrLn "Invalid input."
       startClient

@@ -69,7 +69,8 @@ serverFile = download
                   let aesSession = (cipherInit sessionKey) :: AES128
                   let realPath = B.unpack $ unpad $ ecbDecrypt aesSession $ B.pack $ pathD decodedForm
                   contents <- liftIO $ readFile ("files/" ++ realPath)
-                  return $ B.pack $ contents
+                  let encryptedFile = ecbEncrypt aesSession (pad $ B.pack contents)
+                  return encryptedFile
               else do
                 liftIO $ putStrLn "Invalid download requst (ticket expired)"
                 return $ B.pack "ERROR"
