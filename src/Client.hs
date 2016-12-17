@@ -55,6 +55,16 @@ downloadFile t p = do
   file <- downloadApi downloadForm
   return file
 
+uploadFile :: Token -> String -> String -> ClientM (B.ByteString)
+uploadFile t p f = do
+  let Right sessionKey = makeKey $ B.pack $ sessionKeyC t
+  let aesSession = (cipherInit sessionKey) :: AES128
+  let encodedPath = B.unpack $ ecbEncrypt aesSession (pad $ B.pack p)
+  let encodedFile = B.unpack $ ecbEncrypt aesSession (pad $ B.pack f)
+  let uploadForm = BL.toStrict $ encode (UploadForm {ticketU = (ticket t), pathU = encodedPath, fileU = encodedFile})
+  file <- uploadApi uploadForm
+  return file
+
 startClient :: IO ()
 startClient = do
   putStr "Enter a command: "
@@ -83,6 +93,20 @@ startClient = do
               let Right sessionKey = makeKey $ B.pack $ sessionKeyC tk
               let aesSession = (cipherInit sessionKey) :: AES128
               print $ unpad $ ecbDecrypt aesSession $ f
+      startClient
+    "upload" -> do
+      token <- getToken
+      case token of
+        Nothing -> putStrLn $ "Could not decode token..."
+        Just tk -> do
+          manager <- newManager defaultManagerSettings
+          res <- runClientM (uploadFile tk "b.txt" "trololo") (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
+          case res of
+            Left err -> putStrLn $ "Could not upload file..."
+            Right (f) -> do
+              putStrLn $ "Server response: "
+              putStrLn $ B.unpack f
+      startClient
     _   -> do
       putStrLn "Invalid input."
       startClient

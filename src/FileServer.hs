@@ -72,7 +72,7 @@ serverFile = download
                   let encryptedFile = ecbEncrypt aesSession (pad $ B.pack contents)
                   return encryptedFile
               else do
-                liftIO $ putStrLn "Invalid download requst (ticket expired)"
+                liftIO $ putStrLn "Invalid download request (ticket expired)"
                 return $ B.pack "ERROR"
 
       upload :: B.ByteString -> Handler B.ByteString
@@ -94,5 +94,5 @@ serverFile = download
                   liftIO $ writeFile ("files/" ++ realPath) (B.unpack realFile)
                   return $ B.pack "OK"
               else do
-                liftIO $ putStrLn "Invalid upload requst (ticket expired)"
+                liftIO $ putStrLn "Invalid upload request (ticket expired)"
                 return $ B.pack "ERROR"
