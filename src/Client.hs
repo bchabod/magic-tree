@@ -17,6 +17,7 @@ import Crypto.Cipher.Types
 import qualified Data.ByteString.Lazy as BL
 
 import Auth
+import DirService
 import FileServer
 
 clientSecret = B.pack "v2VxGDC61jV6E45J"
@@ -65,6 +66,18 @@ uploadFile t p f = do
   file <- uploadApi uploadForm
   return file
 
+dirServiceApi :: B.ByteString -> ClientM B.ByteString
+dirServiceApi = client apid
+
+requestShard :: Token -> String -> ClientM (B.ByteString)
+requestShard t s = do
+  let Right sessionKey = makeKey $ B.pack $ sessionKeyC t
+  let aesSession = (cipherInit sessionKey) :: AES128
+  let encodedName = B.unpack $ ecbEncrypt aesSession (pad $ B.pack s)
+  let addressForm = BL.toStrict $ encode (AddressForm {ticketA = (ticket t), pathA = encodedName})
+  shard <- dirServiceApi addressForm
+  return shard
+
 startClient :: IO ()
 startClient = do
   putStr "Enter a command: "
@@ -73,27 +86,39 @@ startClient = do
   case str of
     "quit" -> return ()
     "exit" -> return ()
+
     "token" -> do
       token <- getToken
       case token of
           Nothing -> putStrLn $ "Could not decode token..."
           Just tk -> putStrLn $ "Received token from server with timeout: " ++ show (timeoutC tk)
       startClient
+
     "download" -> do
+      -- Ask Auth Server for token
       token <- getToken
       case token of
         Nothing -> putStrLn $ "Could not decode token..."
         Just tk -> do
+          -- Ask Directory Server for shard address and port
           manager <- newManager defaultManagerSettings
-          res <- runClientM (downloadFile tk "a.txt") (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
-          case res of
-            Left err -> putStrLn $ "Could not download file..."
-            Right (f) -> do
-              putStrLn $ "Received file: "
+          shard <- runClientM (requestShard tk "shard1") (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
+          case shard of
+            Left err -> putStrLn "Could not get correct shard info from Dir. Service"
+            Right sh -> do
               let Right sessionKey = makeKey $ B.pack $ sessionKeyC tk
               let aesSession = (cipherInit sessionKey) :: AES128
-              print $ unpad $ ecbDecrypt aesSession $ f
+              let rawConfig = unpad $ ecbDecrypt aesSession $ sh
+              let Just config = decode (BL.fromStrict $ unpad $ rawConfig) :: Maybe Config
+              -- Request the file from shard
+              res <- runClientM (downloadFile tk "a.txt") (ClientEnv manager (BaseUrl Http (address config) (port config) ""))
+              case res of
+                Left err -> putStrLn $ "Could not download file..."
+                Right (f) -> do
+                  putStrLn $ "Received file: "
+                  print $ unpad $ ecbDecrypt aesSession $ f
       startClient
+
     "upload" -> do
       token <- getToken
       case token of

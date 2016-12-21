@@ -88,6 +88,7 @@ serverAuth :: Server AccessAPI
 serverAuth id = do
   timeout <- liftIO $ round `fmap` getPOSIXTime
   sessionKey <- liftIO $ getEntropy 16
+  liftIO $ putStrLn $ "Received token request for user " ++ (show id)
   return $ case id of
     Nothing -> B.pack "No user ID given"
     Just id -> let filteredUsers = filter (\u -> userId u == id) users in

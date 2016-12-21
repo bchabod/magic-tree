@@ -1,0 +1,11 @@
+[{
+	"shardName": "shard1",
+	"address": "localhost",
+	"port": 8082
+},
+{
+	"shardName": "shard2",
+	"address": "localhost",
+	"port": 8083
+}
+]
