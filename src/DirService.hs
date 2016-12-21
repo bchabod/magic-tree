@@ -74,9 +74,7 @@ serverDir = serveShard
                     liftIO $ putStrLn "Could not find associated config for this shard"
                     return $ B.pack "ERROR"
                   Just sc -> do
-                    let p = port sc
-                    let a = address sc
-                    let response = BL.toStrict $ encode (Config {shardName = shard, port = p, address = a})
+                    let response = BL.toStrict $ encode (Config {shardName = shard, port = port sc, address = address sc})
                     let encryptedResponse = ecbEncrypt aesSession (pad $ response)
                     liftIO $ putStrLn $ "Replied to config request for shard: " ++ shard
                     return encryptedResponse

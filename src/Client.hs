@@ -125,12 +125,20 @@ startClient = do
         Nothing -> putStrLn $ "Could not decode token..."
         Just tk -> do
           manager <- newManager defaultManagerSettings
-          res <- runClientM (uploadFile tk "b.txt" "trololo") (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
-          case res of
-            Left err -> putStrLn $ "Could not upload file..."
-            Right (f) -> do
-              putStrLn $ "Server response: "
-              putStrLn $ B.unpack f
+          shard <- runClientM (requestShard tk "shard1") (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
+          case shard of
+            Left err -> putStrLn "Could not get correct shard info from Dir. Service"
+            Right sh -> do
+              let Right sessionKey = makeKey $ B.pack $ sessionKeyC tk
+              let aesSession = (cipherInit sessionKey) :: AES128
+              let rawConfig = unpad $ ecbDecrypt aesSession $ sh
+              let Just config = decode (BL.fromStrict $ unpad $ rawConfig) :: Maybe Config
+              res <- runClientM (uploadFile tk "b.txt" "trololo") (ClientEnv manager (BaseUrl Http (address config) (port config) ""))
+              case res of
+                Left err -> putStrLn $ "Could not upload file..."
+                Right (f) -> do
+                  putStrLn $ "Server response: "
+                  putStrLn $ B.unpack f
       startClient
     _   -> do
       putStrLn "Invalid input."
