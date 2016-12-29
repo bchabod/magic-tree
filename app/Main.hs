@@ -5,6 +5,7 @@ import Auth
 import Client
 import FileServer
 import DirService
+import BigPixel
 
 main :: IO ()
 main = do
@@ -14,3 +15,4 @@ main = do
     "client" -> startClient
     "fs" -> startFile $ args !! 1
     "ds" -> startDirService
+    "bp" -> runBigpixel ["test.bmp"]

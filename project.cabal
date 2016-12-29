@@ -15,10 +15,12 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
+                     , bigpixel
   exposed-modules:     Auth
                      , Client
                      , FileServer
                      , DirService
+                     , BigPixel
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , servant
@@ -33,6 +35,10 @@ library
                      , crypto-cipher-types
                      , entropy
                      , mtl
+                     , array >= 0.3
+                     , bmp >= 1.2.5.1 && < 2.0
+                     , bytestring > 0.10
+                     , gloss >= 1.7 && < 2.0
   default-language:    Haskell2010
 
 executable project-exe
