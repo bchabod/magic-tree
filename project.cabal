@@ -21,6 +21,7 @@ library
                      , FileServer
                      , DirService
                      , BigPixel
+                     , Lock
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , servant
