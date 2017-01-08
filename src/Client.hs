@@ -19,18 +19,21 @@ import qualified Data.ByteString.Lazy as BL
 import Auth
 import DirService
 import FileServer
+import Lock
 
 clientSecret = B.pack "v2VxGDC61jV6E45J"
+clientId = 1
 Right cKey = makeKey clientSecret
 aesClient :: AES128
 aesClient = cipherInit cKey
 
+-- Auth Client
 tokenApi :: Maybe Int -> ClientM B.ByteString
 tokenApi = client api
 
 requestToken :: ClientM (B.ByteString)
 requestToken = do
-  token <- tokenApi (Just 1)
+  token <- tokenApi (Just clientId)
   return $ ecbDecrypt aesClient token
 
 getToken :: IO (Maybe Token)
@@ -43,6 +46,7 @@ getToken = do
     Right (t) -> do
       return (decode (BL.fromStrict $ unpad $ t) :: Maybe Token)
 
+-- File Server Client
 downloadApi :: B.ByteString -> ClientM B.ByteString
 uploadApi :: B.ByteString -> ClientM B.ByteString
 downloadApi :<|> uploadApi = client apif
@@ -66,6 +70,7 @@ uploadFile t p f = do
   file <- uploadApi uploadForm
   return file
 
+-- Directory Service Client
 dirServiceApi :: B.ByteString -> ClientM B.ByteString
 dirServiceApi = client apid
 
@@ -78,6 +83,22 @@ requestShard t s = do
   shard <- dirServiceApi addressForm
   return shard
 
+-- Lock Service Client
+lockApi :: B.ByteString -> ClientM B.ByteString
+releaseApi :: B.ByteString -> ClientM B.ByteString
+isFreeApi :: B.ByteString -> ClientM B.ByteString
+lockApi :<|> releaseApi :<|> isFreeApi = client apil
+
+lockAction :: (B.ByteString -> ClientM B.ByteString) -> Token -> String -> ClientM (B.ByteString)
+lockAction a t p = do
+  let Right sessionKey = makeKey $ B.pack $ sessionKeyC t
+  let aesSession = (cipherInit sessionKey) :: AES128
+  let encodedPath = B.unpack $ ecbEncrypt aesSession (pad $ B.pack p)
+  let lockForm = BL.toStrict $ encode (LockForm {ticketLF = (ticket t), pathLF = encodedPath})
+  response <- a lockForm
+  return response
+
+-- Main client UI
 startClient :: IO ()
 startClient = do
   putStr "Enter a command: "
@@ -140,6 +161,45 @@ startClient = do
                   putStrLn $ "Server response: "
                   putStrLn $ B.unpack f
       startClient
+
+    "lock" -> do
+      token <- getToken
+      case token of
+        Nothing -> putStrLn $ "Could not decode token..."
+        Just tk -> do
+          manager <- newManager defaultManagerSettings
+          res <- runClientM (lockAction lockApi tk "shard1/a.txt") (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
+          case res of
+            Left err -> putStrLn $ "Could not lock file..."
+            Right (f) -> putStrLn $ "Locked."
+      startClient
+
+    "release" -> do
+      token <- getToken
+      case token of
+        Nothing -> putStrLn $ "Could not decode token..."
+        Just tk -> do
+          manager <- newManager defaultManagerSettings
+          res <- runClientM (lockAction releaseApi tk "shard1/a.txt") (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
+          case res of
+            Left err -> putStrLn $ "Could not release file..."
+            Right (f) -> putStrLn $ "Released."
+      startClient
+
+    "isfree" -> do
+      token <- getToken
+      case token of
+        Nothing -> putStrLn $ "Could not decode token..."
+        Just tk -> do
+          manager <- newManager defaultManagerSettings
+          res <- runClientM (lockAction isFreeApi tk "shard1/a.txt") (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
+          case res of
+            Left err -> putStrLn $ "Could not check lock..."
+            Right (l) -> do
+              putStrLn $ "Server response: "
+              putStrLn $ B.unpack l
+      startClient
+
     _   -> do
       putStrLn "Invalid input."
       startClient

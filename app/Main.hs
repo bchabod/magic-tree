@@ -6,6 +6,7 @@ import Client
 import FileServer
 import DirService
 import BigPixel
+import Lock
 
 main :: IO ()
 main = do
@@ -16,3 +17,4 @@ main = do
     "fs" -> startFile $ args !! 1
     "ds" -> startDirService
     "bp" -> runBigpixel ["test.bmp"]
+    "lock" -> startLock

@@ -33,7 +33,7 @@ $(deriveJSON defaultOptions ''LockForm)
 data Lock = Lock
   { userIdL          :: Int
   , pathL            :: [Char]
-  } deriving( Eq )
+  } deriving ( Eq )
 $(deriveJSON defaultOptions ''Lock)
 
 type LockAPI = "lock" :> ReqBody '[OctetStream] B.ByteString :> Get '[OctetStream] B.ByteString
@@ -70,22 +70,27 @@ serverLock = lock :<|> release :<|> isfree
       lock :: B.ByteString -> Handler B.ByteString
       lock f = do
         (Just decodedLock) <- liftIO $ getLock f
+        liftIO $ putStrLn $ "Received lock request from user " ++ (show $ userIdL decodedLock) ++ " on file " ++ (pathL decodedLock)
         contents <- liftIO $ readFile ("files/locks.json")
         let (Just realContents) = decode (BL.fromStrict $ B.pack $ contents) :: Maybe [Lock]
-        liftIO $ writeFile ("files/locks.json") $ B.unpack $ BL.toStrict $ encode (realContents ++ [decodedLock])
+        let newContents = realContents ++ [decodedLock]
+        when (length newContents > 0) $ liftIO $ writeFile ("files/locks.json") $ B.unpack $ BL.toStrict $ encode newContents
         return $ B.pack "OK"
 
       release :: B.ByteString -> Handler B.ByteString
       release f = do
         (Just decodedLock) <- liftIO $ getLock f
+        liftIO $ putStrLn $ "Received release request from user " ++ (show $ userIdL decodedLock) ++ " on file " ++ (pathL decodedLock)
         contents <- liftIO $ readFile ("files/locks.json")
         let (Just realContents) = decode (BL.fromStrict $ B.pack $ contents) :: Maybe [Lock]
-        liftIO $ writeFile ("files/locks.json") $ B.unpack $ BL.toStrict $ encode (filter (\x -> x /= decodedLock) realContents)
+        let newContents = filter (\le -> le /= decodedLock) realContents
+        when (length realContents > 0) $ liftIO $ writeFile ("files/locks.json") $ B.unpack $ BL.toStrict $ encode newContents
         return $ B.pack "OK"
 
       isfree :: B.ByteString -> Handler B.ByteString
       isfree f = do
         (Just decodedLock) <- liftIO $ getLock f
+        liftIO $ putStrLn $ "Received check question from user " ++ (show $ userIdL decodedLock) ++ " on file " ++ (pathL decodedLock)
         contents <- liftIO $ readFile ("files/locks.json")
         let (Just realContents) = decode (BL.fromStrict $ B.pack $ contents) :: Maybe [Lock]
         let collision = find (\x -> (pathL x) == (pathL decodedLock)) realContents
