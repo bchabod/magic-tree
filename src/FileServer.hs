@@ -19,6 +19,7 @@ import Data.Time.Clock.POSIX
 import System.Entropy
 import Crypto.Cipher
 import Crypto.Cipher.Types
+import qualified Data.ByteString as DB
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy as BL
 
@@ -76,8 +77,8 @@ serverFile shard = download
                   let Right sessionKey = makeKey $ B.pack $ sessionKeyS ticket
                   let aesSession = (cipherInit sessionKey) :: AES128
                   let realPath = B.unpack $ unpad $ ecbDecrypt aesSession $ B.pack $ pathD decodedForm
-                  contents <- liftIO $ readFile ("files/" ++ shard ++ "/" ++ realPath)
-                  let encryptedFile = ecbEncrypt aesSession (pad $ B.pack contents)
+                  contents <- liftIO $ DB.readFile ("files/" ++ shard ++ "/" ++ realPath)
+                  let encryptedFile = ecbEncrypt aesSession (pad $ contents)
                   liftIO $ putStrLn $ "Successfully served file: " ++ shard ++ "/" ++ realPath
                   return encryptedFile
               else do
