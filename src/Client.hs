@@ -103,27 +103,32 @@ startClient :: IO ()
 startClient = do
   putStr "Enter a command: "
   hFlush stdout
-  str <- getLine
-  case str of
-    "quit" -> return ()
-    "exit" -> return ()
+  rawLine <- getLine
+  let str = words $ rawLine
+  if (length str == 0)
+    then startClient
+  else if (str !! 0 == "quit")
+    then return ()
+  else if (str !! 0 == "exit")
+    then return ()
 
-    "token" -> do
+  else if (str !! 0 == "token")
+    then do
       token <- getToken
       case token of
           Nothing -> putStrLn $ "Could not decode token..."
           Just tk -> putStrLn $ "Received token from server with timeout: " ++ show (timeoutC tk)
       startClient
 
-    "download" -> do
-      -- Ask Auth Server for token
-      token <- getToken
+  else if (str !! 0 == "download")
+    then do
+      token <- getToken -- Ask Auth Server for token
       case token of
         Nothing -> putStrLn $ "Could not decode token..."
         Just tk -> do
           -- Ask Directory Server for shard address and port
           manager <- newManager defaultManagerSettings
-          shard <- runClientM (requestShard tk "shard1") (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
+          shard <- runClientM (requestShard tk (str !! 1)) (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
           case shard of
             Left err -> putStrLn "Could not get correct shard info from Dir. Service"
             Right sh -> do
@@ -132,7 +137,7 @@ startClient = do
               let rawConfig = unpad $ ecbDecrypt aesSession $ sh
               let Just config = decode (BL.fromStrict $ unpad $ rawConfig) :: Maybe Config
               -- Request the file from shard
-              res <- runClientM (downloadFile tk "a.txt") (ClientEnv manager (BaseUrl Http (address config) (port config) ""))
+              res <- runClientM (downloadFile tk (str !! 2)) (ClientEnv manager (BaseUrl Http (address config) (port config) ""))
               case res of
                 Left err -> putStrLn $ "Could not download file..."
                 Right (f) -> do
@@ -140,13 +145,14 @@ startClient = do
                   print $ unpad $ ecbDecrypt aesSession $ f
       startClient
 
-    "upload" -> do
+  else if (str !! 0 == "upload")
+    then do
       token <- getToken
       case token of
         Nothing -> putStrLn $ "Could not decode token..."
         Just tk -> do
           manager <- newManager defaultManagerSettings
-          shard <- runClientM (requestShard tk "shard1") (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
+          shard <- runClientM (requestShard tk (str !! 1)) (ClientEnv manager (BaseUrl Http "localhost" 8081 ""))
           case shard of
             Left err -> putStrLn "Could not get correct shard info from Dir. Service"
             Right sh -> do
@@ -154,7 +160,7 @@ startClient = do
               let aesSession = (cipherInit sessionKey) :: AES128
               let rawConfig = unpad $ ecbDecrypt aesSession $ sh
               let Just config = decode (BL.fromStrict $ unpad $ rawConfig) :: Maybe Config
-              res <- runClientM (uploadFile tk "b.txt" "trololo") (ClientEnv manager (BaseUrl Http (address config) (port config) ""))
+              res <- runClientM (uploadFile tk (str !! 2) (str !! 3)) (ClientEnv manager (BaseUrl Http (address config) (port config) ""))
               case res of
                 Left err -> putStrLn $ "Could not upload file..."
                 Right (f) -> do
@@ -162,44 +168,46 @@ startClient = do
                   putStrLn $ B.unpack f
       startClient
 
-    "lock" -> do
+  else if (str !! 0 == "lock")
+    then do
       token <- getToken
       case token of
         Nothing -> putStrLn $ "Could not decode token..."
         Just tk -> do
           manager <- newManager defaultManagerSettings
-          res <- runClientM (lockAction lockApi tk "shard1/a.txt") (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
+          res <- runClientM (lockAction lockApi tk (str !! 1)) (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
           case res of
             Left err -> putStrLn $ "Could not lock file..."
             Right (f) -> putStrLn $ "Locked."
       startClient
 
-    "release" -> do
+  else if (str !! 0 == "release")
+    then do
       token <- getToken
       case token of
         Nothing -> putStrLn $ "Could not decode token..."
         Just tk -> do
           manager <- newManager defaultManagerSettings
-          res <- runClientM (lockAction releaseApi tk "shard1/a.txt") (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
+          res <- runClientM (lockAction releaseApi tk (str !! 1)) (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
           case res of
             Left err -> putStrLn $ "Could not release file..."
             Right (f) -> putStrLn $ "Released."
       startClient
 
-    "isfree" -> do
+  else if (str !! 0 == "isfree")
+    then do
       token <- getToken
       case token of
         Nothing -> putStrLn $ "Could not decode token..."
         Just tk -> do
           manager <- newManager defaultManagerSettings
-          res <- runClientM (lockAction isFreeApi tk "shard1/a.txt") (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
+          res <- runClientM (lockAction isFreeApi tk (str !! 1)) (ClientEnv manager (BaseUrl Http "localhost" 8084 ""))
           case res of
             Left err -> putStrLn $ "Could not check lock..."
             Right (l) -> do
               putStrLn $ "Server response: "
               putStrLn $ B.unpack l
       startClient
-
-    _   -> do
-      putStrLn "Invalid input."
-      startClient
+  else do
+    putStrLn "Invalid input."
+    startClient
